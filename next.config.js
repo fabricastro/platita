@@ -11,8 +11,17 @@ const nextConfig = {
   trailingSlash: false,
   // Configuración para manejo de archivos estáticos
   experimental: {
-    optimizeCss: true,
+    // Remover optimizeCss que causa problemas
   },
+  // Configuración para evitar problemas de exportación estática
+  output: 'standalone',
+  // Configuración para manejar páginas de error
+  async redirects() {
+    return []
+  },
+  async headers() {
+    return []
+  }
 }
 
 module.exports = nextConfig
