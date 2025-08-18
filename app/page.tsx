@@ -1,21 +1,23 @@
 'use client'
 
-import React, { useState } from 'react'
-import { signOut } from 'next-auth/react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { LogOut, User } from 'lucide-react'
 import { TabType } from './types'
 import { useFinanceData } from './hooks/useFinanceData'
+import { useSessionManager } from './hooks/useSessionManager'
 import { 
   Navigation, 
   Dashboard, 
   SalaryManager, 
   ExpensesManager, 
   SavingsManager, 
-  WishlistManager 
+  WishlistManager,
+  ExtraIncomeManager
 } from './components'
 
 const FinanceTracker = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const { signOut: handleSignOut } = useSessionManager()
   const {
     user,
     setUser,
@@ -25,17 +27,23 @@ const FinanceTracker = () => {
     setSavings,
     wishlist,
     setWishlist,
+    extraIncome,
+    setExtraIncome,
     loading,
     session,
     isAuthenticated
   } = useFinanceData()
 
-  // Cálculo del total de ahorros
-  const totalSavings = savings.reduce((sum, sav) => sum + sav.amount, 0)
+  // Cálculo del total de ahorros - memoizado para evitar recálculos innecesarios
+  const totalSavings = useMemo(() => 
+    savings.reduce((sum, sav) => sum + sav.amount, 0), 
+    [savings]
+  )
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/login' })
-  }
+  // Memoizar el handler de cambio de tab
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab)
+  }, [])
 
   if (loading) {
     return (
@@ -55,17 +63,14 @@ const FinanceTracker = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navigation activeTab={activeTab} setActiveTab={handleTabChange} />
       
       <main className="container mx-auto py-6 px-4">
         {/* Header con información del usuario */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Mi Administrador Financiero
-            </h1>
             <p className="text-muted-foreground">
-              Gestiona tus finanzas de manera inteligente
+              Gestiona tu platita de manera inteligente
             </p>
           </div>
           
@@ -89,6 +94,7 @@ const FinanceTracker = () => {
             user={user} 
             expenses={expenses} 
             totalSavings={totalSavings} 
+            extraIncome={extraIncome}
           />
         )}
 
@@ -96,6 +102,8 @@ const FinanceTracker = () => {
           <SalaryManager 
             user={user} 
             setUser={setUser} 
+            extraIncome={extraIncome}
+            setExtraIncome={setExtraIncome}
           />
         )}
 
@@ -117,6 +125,14 @@ const FinanceTracker = () => {
           <WishlistManager 
             wishlist={wishlist} 
             setWishlist={setWishlist} 
+            savings={savings}
+          />
+        )}
+
+        {activeTab === 'extra-income' && (
+          <ExtraIncomeManager 
+            extraIncome={extraIncome} 
+            setExtraIncome={setExtraIncome} 
           />
         )}
       </main>

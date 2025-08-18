@@ -3,6 +3,7 @@ import { Readex_Pro } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from 'sonner'
 
 const readexPro = Readex_Pro({
   subsets: ['latin'],
@@ -36,6 +37,13 @@ export default function RootLayout({
         >
           <Providers>
             {children}
+            <Toaster 
+              position="top-right"
+              richColors
+              closeButton
+              duration={4000}
+              className="z-50"
+            />
           </Providers>
         </ThemeProvider>
       </body>

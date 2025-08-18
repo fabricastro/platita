@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { Target, Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { Target, Wallet, TrendingUp, TrendingDown, DollarSign, Plus } from 'lucide-react'
 import { TabType } from '../types'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -70,6 +70,9 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
             </TabButton>
             <TabButton tab="wishlist" icon={Target} activeTab={activeTab} onClick={setActiveTab}>
               <span className="hidden sm:inline">Lista</span>
+            </TabButton>
+            <TabButton tab="extra-income" icon={Plus} activeTab={activeTab} onClick={setActiveTab}>
+              <span className="hidden sm:inline">Extra</span>
             </TabButton>
           </nav>
           <ThemeToggle />

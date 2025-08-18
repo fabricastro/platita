@@ -1,24 +1,34 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Target, Trash2, Edit } from 'lucide-react'
-import { WishItem, WishForm } from '../types'
+import { Target, Trash2, Edit, Save, X, CheckCircle, XCircle } from 'lucide-react'
+import { WishItem, WishForm, Saving } from '../types'
 import { formatCurrency } from '../utils/formatters'
 import { priorities } from '../constants'
 
 interface WishlistManagerProps {
   wishlist: WishItem[]
   setWishlist: (wishlist: WishItem[]) => void
+  savings: Saving[]
 }
 
-export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setWishlist }) => {
+export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setWishlist, savings }) => {
   const [editingWishItem, setEditingWishItem] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<WishItem>>({})
   const [wishForm, setWishForm] = useState<WishForm>({
     item: '',
     price: '',
     priority: 'media',
     saved: '0'
   })
+
+  // Calcular total de ahorros
+  const totalSavings = savings.reduce((total, saving) => total + saving.amount, 0)
+
+  // Verificar si un deseo se puede cubrir con los ahorros actuales
+  const canAffordWish = (price: number) => {
+    return totalSavings >= price
+  }
 
   const addWishItem = async () => {
     if (wishForm.item && wishForm.price) {
@@ -47,20 +57,36 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
     }
   }
 
-  const updateWishItem = async (id: string, updatedData: Partial<WishItem>) => {
+  const startEditing = (item: WishItem) => {
+    setEditingWishItem(item.id)
+    setEditForm({
+      item: item.item,
+      price: item.price,
+      priority: item.priority,
+      saved: item.saved
+    })
+  }
+
+  const cancelEditing = () => {
+    setEditingWishItem(null)
+    setEditForm({})
+  }
+
+  const saveEditing = async (id: string) => {
     try {
       const response = await fetch(`/api/wishlist?id=${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatedData),
+        body: JSON.stringify(editForm),
       })
 
       if (response.ok) {
         const updatedItem = await response.json()
         setWishlist(wishlist.map(item => item.id === id ? updatedItem : item))
         setEditingWishItem(null)
+        setEditForm({})
       }
     } catch (error) {
       console.error('Error updating wish item:', error)
@@ -85,7 +111,7 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">Agregar a Lista de Deseos</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
             placeholder="¿Qué quieres comprar?"
@@ -111,20 +137,18 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
               <option key={priority} value={priority} className="capitalize">{priority}</option>
             ))}
           </select>
-          <input
-            type="number"
-            placeholder="Ya ahorrado"
-            value={wishForm.saved}
-            onChange={(e) => setWishForm({...wishForm, saved: e.target.value})}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          />
           <button
             onClick={addWishItem}
-            className="md:col-span-4 bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 flex items-center justify-center gap-2"
+            className="md:col-span-3 bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 flex items-center justify-center gap-2"
           >
             <Target size={18} />
             Agregar a Lista de Deseos
           </button>
+        </div>
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            💰 <strong>Ahorros totales:</strong> {formatCurrency(totalSavings)}
+          </p>
         </div>
       </div>
 
@@ -135,43 +159,60 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
             <p className="text-gray-500 dark:text-gray-400 text-center py-4 col-span-full">No hay artículos en tu lista de deseos</p>
           ) : (
             wishlist.map(item => {
-              const progress = (item.saved / item.price) * 100
+              const canAfford = canAffordWish(item.price)
+              const remainingAfterPurchase = totalSavings - item.price
               return (
                 <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
                   {editingWishItem === item.id ? (
                     <div className="space-y-3">
                       <input
                         type="text"
-                        defaultValue={item.item}
-                        onBlur={(e) => updateWishItem(item.id, { item: e.target.value })}
+                        value={editForm.item || ''}
+                        onChange={(e) => setEditForm({...editForm, item: e.target.value})}
                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                         autoFocus
                       />
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="number"
-                          defaultValue={item.price}
-                          onBlur={(e) => updateWishItem(item.id, { price: parseFloat(e.target.value) })}
+                          value={editForm.price || ''}
+                          onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value)})}
                           className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                           placeholder="Precio"
                         />
                         <input
                           type="number"
-                          defaultValue={item.saved}
-                          onBlur={(e) => updateWishItem(item.id, { saved: parseFloat(e.target.value) })}
+                          value={editForm.saved || ''}
+                          onChange={(e) => setEditForm({...editForm, saved: parseFloat(e.target.value)})}
                           className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                           placeholder="Ahorrado"
                         />
                       </div>
                       <select
-                        defaultValue={item.priority}
-                        onChange={(e) => updateWishItem(item.id, { priority: e.target.value })}
+                        value={editForm.priority || ''}
+                        onChange={(e) => setEditForm({...editForm, priority: e.target.value})}
                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                       >
                         {priorities.map(priority => (
                           <option key={priority} value={priority} className="capitalize">{priority}</option>
                         ))}
                       </select>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveEditing(item.id)}
+                          className="flex-1 bg-green-500 text-white px-2 py-1 rounded text-sm hover:bg-green-600 flex items-center justify-center gap-1"
+                        >
+                          <Save size={14} />
+                          Guardar
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className="flex-1 bg-gray-500 text-white px-2 py-1 rounded text-sm hover:bg-gray-600 flex items-center justify-center gap-1"
+                        >
+                          <X size={14} />
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -179,7 +220,7 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
                         <h4 className="font-medium text-gray-900 dark:text-gray-100">{item.item}</h4>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setEditingWishItem(item.id)}
+                            onClick={() => startEditing(item)}
                             className="text-blue-500 hover:text-blue-700"
                             title="Editar"
                           >
@@ -196,21 +237,29 @@ export const WishlistManager: React.FC<WishlistManagerProps> = ({ wishlist, setW
                       </div>
                       <p className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-1">{formatCurrency(item.price)}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 capitalize">Prioridad: {item.priority}</p>
-                      <div className="mb-2">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Progreso</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(progress, 100)}%` }}
-                          ></div>
+                      
+                      {/* Indicador de disponibilidad de ahorros */}
+                      <div className="mb-3 p-2 rounded-lg border">
+                        {canAfford ? (
+                          <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                            <CheckCircle size={16} />
+                            <span className="text-sm font-medium">¡Puedes comprarlo!</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                            <XCircle size={16} />
+                            <span className="text-sm font-medium">No tienes suficientes ahorros</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {canAfford 
+                            ? `Te quedarían ${formatCurrency(remainingAfterPurchase)} después de la compra`
+                            : `Te faltan ${formatCurrency(item.price - totalSavings)}`
+                          }
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Ahorrado: {formatCurrency(item.saved)} / Falta: {formatCurrency(item.price - item.saved)}
-                      </p>
+
+                      
                     </>
                   )}
                 </div>

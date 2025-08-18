@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -27,6 +29,8 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        // Configurar la duración de la sesión según la preferencia del usuario
+        maxAge: rememberMe ? 90 * 24 * 60 * 60 : 30 * 24 * 60 * 60, // 90 días o 30 días
       })
 
       if (result?.error) {
@@ -80,6 +84,20 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label 
+                htmlFor="rememberMe" 
+                className="text-sm text-muted-foreground cursor-pointer"
+              >
+                Recordar sesión por 90 días
+              </Label>
             </div>
 
             {error && (

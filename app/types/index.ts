@@ -32,6 +32,15 @@ export interface WishItem {
   updatedAt: string
 }
 
+export interface ExtraIncome {
+  id: string
+  description: string
+  amount: number
+  date: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface User {
   id: string
   email: string
@@ -63,7 +72,13 @@ export interface WishForm {
   saved: string
 }
 
-export type TabType = 'dashboard' | 'salary' | 'expenses' | 'savings' | 'wishlist'
+export interface ExtraIncomeForm {
+  description: string
+  amount: string
+  date: string
+}
+
+export type TabType = 'dashboard' | 'salary' | 'expenses' | 'savings' | 'wishlist' | 'extra-income'
 export type Priority = 'alta' | 'media' | 'baja'
 export type Category = 'comida' | 'transporte' | 'entretenimiento' | 'ropa' | 'salud' | 'servicios' | 'educacion' | 'hogar' | 'otros'
 export type ExpenseType = 'unico' | 'tarjeta'

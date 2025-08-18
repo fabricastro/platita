@@ -3,18 +3,21 @@
 import React, { useState, useEffect } from 'react'
 import { User } from '../types'
 import { formatCurrency } from '../utils/formatters'
+import { ExtraIncomeManager } from './ExtraIncomeManager'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Loader2, DollarSign, Save, AlertCircle } from 'lucide-react'
+import { Loader2, DollarSign, Save, AlertCircle, PlusCircle } from 'lucide-react'
 
 interface SalaryManagerProps {
   user: User | null
   setUser: (user: User | null) => void
+  extraIncome: any[]
+  setExtraIncome: (extraIncome: any[]) => void
 }
 
-export const SalaryManager: React.FC<SalaryManagerProps> = ({ user, setUser }) => {
+export const SalaryManager: React.FC<SalaryManagerProps> = ({ user, setUser, extraIncome, setExtraIncome }) => {
   const [salaryInput, setSalaryInput] = useState('')
   const [savingSalary, setSavingSalary] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -72,73 +75,80 @@ export const SalaryManager: React.FC<SalaryManagerProps> = ({ user, setUser }) =
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Configurar Sueldo
-          </CardTitle>
-          <CardDescription>
-            Define tu sueldo mensual para un mejor seguimiento de tus finanzas
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="salary">Sueldo Mensual</Label>
-            <Input
-              id="salary"
-              type="number"
-              value={salaryInput}
-              onChange={(e) => handleSalaryInputChange(e.target.value)}
-              placeholder="Ingresa tu sueldo mensual"
-              disabled={savingSalary}
-            />
-            {hasUnsavedChanges && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Tienes cambios sin guardar
-              </p>
-            )}
-          </div>
-
-          {hasUnsavedChanges && (
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleSaveSalary} 
+    <div className="space-y-6">
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Configurar Sueldo
+            </CardTitle>
+            <CardDescription>
+              Define tu sueldo mensual para un mejor seguimiento de tus finanzas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="salary">Sueldo Mensual</Label>
+              <Input
+                id="salary"
+                type="number"
+                value={salaryInput}
+                onChange={(e) => handleSalaryInputChange(e.target.value)}
+                placeholder="Ingresa tu sueldo mensual"
                 disabled={savingSalary}
-                className="flex-1"
-              >
-                {savingSalary ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar
-                  </>
-                )}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleDiscardChanges}
-                disabled={savingSalary}
-              >
-                Descartar
-              </Button>
+              />
+              {hasUnsavedChanges && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Tienes cambios sin guardar
+                </p>
+              )}
             </div>
-          )}
-          
-          <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Sueldo actual</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(user?.salary || 0)}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+
+            {hasUnsavedChanges && (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleSaveSalary} 
+                  disabled={savingSalary}
+                  className="flex-1"
+                >
+                  {savingSalary ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleDiscardChanges}
+                  disabled={savingSalary}
+                >
+                  Descartar
+                </Button>
+              </div>
+            )}
+            
+            <div className="text-center p-4 bg-muted/30 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Sueldo actual</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {formatCurrency(user?.salary || 0)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <ExtraIncomeManager 
+        extraIncome={extraIncome} 
+        setExtraIncome={setExtraIncome} 
+      />
     </div>
   )
 }

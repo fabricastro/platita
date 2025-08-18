@@ -11,6 +11,7 @@ interface DashboardProps {
   user: User | null
   expenses: Expense[]
   totalSavings: number
+  extraIncome: any[]
 }
 
 const StatCard = ({ 
@@ -47,14 +48,19 @@ const StatCard = ({
   )
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ user, expenses, totalSavings }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, expenses, totalSavings, extraIncome }) => {
   // Cálculos
   const currentMonth = new Date().toISOString().slice(0, 7)
   const monthlyExpenses = expenses
     .filter(exp => exp.date.startsWith(currentMonth))
     .reduce((sum, exp) => sum + exp.amount, 0)
   
-  const availableMoney = (user?.salary || 0) - monthlyExpenses
+  const monthlyExtraIncome = extraIncome
+    .filter(inc => inc.date.startsWith(currentMonth))
+    .reduce((sum, inc) => sum + inc.amount, 0)
+  
+  const totalMonthlyIncome = (user?.salary || 0) + monthlyExtraIncome
+  const availableMoney = totalMonthlyIncome - monthlyExpenses
 
   // Gastos por categoría del mes actual
   const expensesByCategory = categories.map(category => {
@@ -68,8 +74,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, expenses, totalSavin
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Sueldo Mensual"
-          value={formatCurrency(user?.salary || 0)}
+          title="Ingresos Totales"
+          value={formatCurrency(totalMonthlyIncome)}
           icon={DollarSign}
           trend="positive"
         />
