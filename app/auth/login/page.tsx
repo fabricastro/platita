@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,6 +28,11 @@ export default function LoginPage() {
     setError('')
 
     try {
+      console.log('🚀 Intentando iniciar sesión...')
+      console.log('🌍 Entorno:', process.env.NODE_ENV)
+      console.log('📧 Email:', email)
+      console.log('🔗 URL actual:', window.location.href)
+      
       const result = await signIn('credentials', {
         email,
         password,
@@ -35,13 +41,40 @@ export default function LoginPage() {
         maxAge: rememberMe ? 90 * 24 * 60 * 60 : 30 * 24 * 60 * 60, // 90 días o 30 días
       })
 
+      console.log('📋 Resultado del signIn:', result)
+      console.log('🔍 Detalles del resultado:', {
+        ok: result?.ok,
+        error: result?.error,
+        status: result?.status,
+        url: result?.url
+      })
+
       if (result?.error) {
-        setError('Credenciales inválidas')
+        console.error('❌ Error en autenticación:', result.error)
+        setError(`Error de autenticación: ${result.error}`)
+      } else if (result?.ok) {
+        console.log('✅ Login exitoso, redirigiendo...')
+        setIsSuccess(true)
+        
+        // Forzar la actualización de la sesión
+        try {
+          // Opción 1: Esperar un poco y luego redirigir
+          setTimeout(() => {
+            console.log('🔄 Redirigiendo después del timeout...')
+            window.location.href = '/'
+          }, 1500) // Aumentar el tiempo para que el usuario vea el mensaje
+        } catch (error) {
+          console.log('🔄 Fallback a router.push...')
+          // Opción 2: Router de Next.js
+          router.push('/')
+        }
       } else {
-        router.push('/')
+        console.error('❓ Resultado inesperado:', result)
+        setError('Error inesperado al iniciar sesión. Intenta de nuevo.')
       }
     } catch (error) {
-      setError('Error al iniciar sesión')
+      console.error('💥 Error en el login:', error)
+      setError('Error de conexión al servidor. Verifica tu conexión a internet.')
     } finally {
       setIsLoading(false)
     }
@@ -57,12 +90,18 @@ export default function LoginPage() {
       <div className="absolute top-20 left-1/2 transform -translate-x-1/2 text-center space-y-4">
         <div className="flex justify-center">
           <Image
-            src="/logosf.png"
+            src="/logo.png"
             alt="Platita Logo"
             width={80}
             height={80}
             priority
             className="w-20 h-20"
+            onError={(e) => {
+              console.error('Error loading logo:', e);
+              // Fallback a texto si la imagen falla
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
           />
         </div>
         <h1 className="text-2xl font-bold text-primary">Platita</h1>
@@ -127,12 +166,18 @@ export default function LoginPage() {
               </div>
             )}
 
+            {isSuccess && (
+              <div className="text-green-600 text-sm text-center bg-green-100 p-2 rounded-md">
+                ✅ ¡Login exitoso! Redirigiendo...
+              </div>
+            )}
+
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isSuccess}
               className="w-full"
             >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              {isLoading ? 'Iniciando sesión...' : isSuccess ? '¡Login exitoso!' : 'Iniciar Sesión'}
             </Button>
 
             <div className="text-center">

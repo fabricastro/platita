@@ -6,6 +6,7 @@ import { prisma } from './prisma'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  debug: true, // Habilitar debug en producción también
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -14,33 +15,59 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Contraseña', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          console.log('🔐 Iniciando proceso de autenticación...')
+          console.log('🌍 Entorno:', process.env.NODE_ENV)
+          console.log('🔗 DATABASE_URL configurada:', !!process.env.DATABASE_URL)
+          
+          if (!credentials?.email || !credentials?.password) {
+            console.log('❌ Credenciales faltantes')
+            return null
           }
-        })
 
-        if (!user || !user.password) {
+          console.log('👤 Buscando usuario con email:', credentials.email)
+
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email
+            }
+          })
+
+          if (!user) {
+            console.log('❌ Usuario no encontrado en la base de datos')
+            return null
+          }
+
+          if (!user.password) {
+            console.log('❌ Usuario sin contraseña')
+            return null
+          }
+
+          console.log('🔑 Verificando contraseña...')
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
+
+          if (!isPasswordValid) {
+            console.log('❌ Contraseña inválida')
+            return null
+          }
+
+          console.log('✅ Usuario autenticado exitosamente:', { 
+            id: user.id, 
+            email: user.email,
+            name: user.name 
+          })
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          }
+        } catch (error) {
+          console.error('💥 Error en authorize:', error)
+          console.error('📋 Stack trace:', error instanceof Error ? error.stack : 'No stack available')
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
         }
       }
     })
@@ -61,6 +88,23 @@ export const authOptions: NextAuthOptions = {
         path: '/',
         secure: process.env.NODE_ENV === 'production',
         maxAge: 30 * 24 * 60 * 60, // 30 días
+      }
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
       }
     }
   },
