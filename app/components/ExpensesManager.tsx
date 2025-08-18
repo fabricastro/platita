@@ -16,7 +16,12 @@ interface ExpensesManagerProps {
 
 export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setExpenses }) => {
   const [editingExpense, setEditingExpense] = useState<string | null>(null)
-  const [editingData, setEditingData] = useState<Partial<Expense>>({})
+  const [editingData, setEditingData] = useState<{
+    description?: string
+    amount?: string | number
+    category?: string
+    date?: string
+  }>({})
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
   const [modalData, setModalData] = useState<{
     isOpen: boolean
@@ -202,7 +207,12 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
 
   const saveExpenseEdit = async (id: string) => {
     if (editingData.description && editingData.amount) {
-      await updateExpense(id, editingData)
+      // Convertir amount a número antes de enviar
+      const dataToUpdate = {
+        ...editingData,
+        amount: typeof editingData.amount === 'string' ? parseFloat(editingData.amount) : editingData.amount
+      }
+      await updateExpense(id, dataToUpdate)
       setEditingData({})
     } else {
       toast.error('Error al guardar', {
@@ -437,7 +447,7 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
                       <input
                         type="text"
                         placeholder="Monto"
-                        value={formatPriceWhileTyping(editingData.amount || '')}
+                        value={formatPriceWhileTyping(String(editingData.amount || ''))}
                         onChange={(e) => {
                           // Permitir escribir libremente, incluyendo comas
                           setEditingData({...editingData, amount: e.target.value})

@@ -27,7 +27,12 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
   onExpenseUpdated
 }) => {
   const [editingExpense, setEditingExpense] = useState<string | null>(null)
-  const [editingData, setEditingData] = useState<Partial<Expense>>({})
+  const [editingData, setEditingData] = useState<{
+    description?: string
+    amount?: string | number
+    category?: string
+    date?: string
+  }>({})
   const [localExpenses, setLocalExpenses] = useState<Expense[]>(expenses)
 
   // Actualizar expenses locales cuando cambien las props
@@ -63,12 +68,18 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
   const saveExpenseEdit = async (id: string) => {
     if (editingData.description && editingData.amount) {
       try {
+        // Convertir amount a número antes de enviar
+        const dataToUpdate = {
+          ...editingData,
+          amount: typeof editingData.amount === 'string' ? parseFloat(editingData.amount) : editingData.amount
+        }
+        
         const response = await fetch(`/api/expenses?id=${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(editingData),
+          body: JSON.stringify(dataToUpdate),
         })
 
         if (response.ok) {
@@ -196,24 +207,24 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                           placeholder="Descripción"
                         />
-                        <input
-                          type="text"
-                          placeholder="Monto (ej: 15.500,50)"
-                          value={formatPriceWhileTyping(editingData.amount || '')}
-                          onChange={(e) => {
-                            // Permitir escribir libremente, incluyendo comas
-                            setEditingData({...editingData, amount: e.target.value})
-                          }}
-                          onBlur={(e) => {
-                            // Al perder el foco, convertir a número y formatear
-                            const parsedValue = parsePriceInput(e.target.value)
-                            if (parsedValue !== undefined) {
-                              setEditingData({...editingData, amount: parsedValue})
-                            }
-                          }}
-                          onKeyDown={(e) => handleKeyDown(e, expense.id)}
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
-                        />
+                                                 <input
+                           type="text"
+                           placeholder="Monto (ej: 15.500,50)"
+                           value={formatPriceWhileTyping(String(editingData.amount || ''))}
+                           onChange={(e) => {
+                             // Permitir escribir libremente, incluyendo comas
+                             setEditingData({...editingData, amount: e.target.value})
+                           }}
+                           onBlur={(e) => {
+                             // Al perder el foco, convertir a número y formatear
+                             const parsedValue = parsePriceInput(e.target.value)
+                             if (parsedValue !== undefined) {
+                               setEditingData({...editingData, amount: parsedValue})
+                             }
+                           }}
+                           onKeyDown={(e) => handleKeyDown(e, expense.id)}
+                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
+                         />
                         <select
                           value={editingData.category || ''}
                           onChange={(e) => setEditingData({...editingData, category: e.target.value})}
