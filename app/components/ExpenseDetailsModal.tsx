@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { X, CreditCard, Receipt, Edit, Trash2, Save, X as CloseIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Expense } from '../types'
-import { formatCurrency, formatDate } from '../utils/formatters'
+import { formatCurrency, formatDate, formatPriceInput, parseFormattedPrice, formatPriceWhileTyping, parsePriceInput } from '../utils/formatters'
 import { categories } from '../constants'
 
 interface ExpenseDetailsModalProps {
@@ -197,18 +197,22 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
                           placeholder="Descripción"
                         />
                         <input
-                          type="number"
-                          value={editingData.amount || ''}
+                          type="text"
+                          placeholder="Monto (ej: 15.500,50)"
+                          value={formatPriceWhileTyping(editingData.amount || '')}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            const amount = value === '' ? undefined : parseFloat(value);
-                            if (!isNaN(amount) || value === '') {
-                              setEditingData({...editingData, amount});
+                            // Permitir escribir libremente, incluyendo comas
+                            setEditingData({...editingData, amount: e.target.value})
+                          }}
+                          onBlur={(e) => {
+                            // Al perder el foco, convertir a número y formatear
+                            const parsedValue = parsePriceInput(e.target.value)
+                            if (parsedValue !== undefined) {
+                              setEditingData({...editingData, amount: parsedValue})
                             }
                           }}
                           onKeyDown={(e) => handleKeyDown(e, expense.id)}
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
-                          placeholder="Monto"
                         />
                         <select
                           value={editingData.category || ''}

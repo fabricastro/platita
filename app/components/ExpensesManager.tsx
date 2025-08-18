@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { PlusCircle, Trash2, Edit, CreditCard, Receipt, Calendar, List, Grid } from 'lucide-react'
 import { toast } from 'sonner'
 import { Expense, ExpenseForm, ExpenseType } from '../types'
-import { formatCurrency, formatDate } from '../utils/formatters'
+import { formatCurrency, formatDate, formatPriceInput, parseFormattedPrice, formatPriceWhileTyping, parsePriceInput } from '../utils/formatters'
 import { categories } from '../constants'
 import { ExpensesCalendar } from './ExpensesCalendar'
 import { ExpenseDetailsModal } from './ExpenseDetailsModal'
@@ -272,20 +272,40 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
           
           {expenseForm.type === 'unico' ? (
             <input
-              type="number"
-              placeholder="Monto"
-              value={expenseForm.amount}
-              onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})}
+              type="text"
+              placeholder="Monto (ej: 15.500,50)"
+              value={formatPriceWhileTyping(expenseForm.amount || '')}
+              onChange={(e) => {
+                // Permitir escribir libremente, incluyendo comas
+                setExpenseForm({...expenseForm, amount: e.target.value})
+              }}
+              onBlur={(e) => {
+                // Al perder el foco, convertir a número y formatear
+                const parsedValue = parsePriceInput(e.target.value)
+                if (parsedValue !== undefined) {
+                  setExpenseForm({...expenseForm, amount: parsedValue.toString()})
+                }
+              }}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           ) : (
             <>
               <input
-                type="number"
-                placeholder="Monto Total"
-                value={expenseForm.totalAmount || ''}
-                onChange={(e) => setExpenseForm({...expenseForm, totalAmount: e.target.value})}
+                type="text"
+                placeholder="Monto Total (ej: 150.000,00)"
+                value={formatPriceWhileTyping(expenseForm.totalAmount || '')}
+                onChange={(e) => {
+                  // Permitir escribir libremente, incluyendo comas
+                  setExpenseForm({...expenseForm, totalAmount: e.target.value})
+                }}
+                onBlur={(e) => {
+                  // Al perder el foco, convertir a número y formatear
+                  const parsedValue = parsePriceInput(e.target.value)
+                  if (parsedValue !== undefined) {
+                    setExpenseForm({...expenseForm, totalAmount: parsedValue.toString()})
+                  }
+                }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
@@ -415,9 +435,20 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
                         autoFocus
                       />
                       <input
-                        type="number"
-                        value={editingData.amount || ''}
-                        onChange={(e) => setEditingData({...editingData, amount: parseFloat(e.target.value)})}
+                        type="text"
+                        placeholder="Monto"
+                        value={formatPriceWhileTyping(editingData.amount || '')}
+                        onChange={(e) => {
+                          // Permitir escribir libremente, incluyendo comas
+                          setEditingData({...editingData, amount: e.target.value})
+                        }}
+                        onBlur={(e) => {
+                          // Al perder el foco, convertir a número y formatear
+                          const parsedValue = parsePriceInput(e.target.value)
+                          if (parsedValue !== undefined) {
+                            setEditingData({...editingData, amount: parsedValue})
+                          }
+                        }}
                         onKeyDown={(e) => handleKeyDown(e, expense.id)}
                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                       />
