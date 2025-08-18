@@ -6,7 +6,7 @@ import { prisma } from './prisma'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  debug: true, // Habilitar debug en producción también
+  debug: process.env.NODE_ENV === 'development', // Solo debug en desarrollo
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -19,13 +19,24 @@ export const authOptions: NextAuthOptions = {
           console.log('🔐 Iniciando proceso de autenticación...')
           console.log('🌍 Entorno:', process.env.NODE_ENV)
           console.log('🔗 DATABASE_URL configurada:', !!process.env.DATABASE_URL)
+          console.log('🔑 NEXTAUTH_SECRET configurado:', !!process.env.NEXTAUTH_SECRET)
+          console.log('🌐 NEXTAUTH_URL configurado:', process.env.NEXTAUTH_URL)
           
           if (!credentials?.email || !credentials?.password) {
             console.log('❌ Credenciales faltantes')
-            return null
+            throw new Error('Email y contraseña son requeridos')
           }
 
           console.log('👤 Buscando usuario con email:', credentials.email)
+
+          // Verificar conexión a la base de datos
+          try {
+            await prisma.$connect()
+            console.log('✅ Conexión a BD exitosa')
+          } catch (dbError) {
+            console.error('❌ Error de conexión a BD:', dbError)
+            throw new Error('Error de conexión a la base de datos')
+          }
 
           const user = await prisma.user.findUnique({
             where: {
@@ -35,12 +46,12 @@ export const authOptions: NextAuthOptions = {
 
           if (!user) {
             console.log('❌ Usuario no encontrado en la base de datos')
-            return null
+            throw new Error('Usuario no encontrado')
           }
 
           if (!user.password) {
             console.log('❌ Usuario sin contraseña')
-            return null
+            throw new Error('Usuario sin contraseña configurada')
           }
 
           console.log('🔑 Verificando contraseña...')
@@ -51,7 +62,7 @@ export const authOptions: NextAuthOptions = {
 
           if (!isPasswordValid) {
             console.log('❌ Contraseña inválida')
-            return null
+            throw new Error('Contraseña incorrecta')
           }
 
           console.log('✅ Usuario autenticado exitosamente:', { 
@@ -59,6 +70,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name 
           })
+          
           return {
             id: user.id,
             email: user.email,
@@ -67,7 +79,13 @@ export const authOptions: NextAuthOptions = {
         } catch (error) {
           console.error('💥 Error en authorize:', error)
           console.error('📋 Stack trace:', error instanceof Error ? error.stack : 'No stack available')
-          return null
+          
+          // En producción, no exponer detalles del error
+          if (process.env.NODE_ENV === 'production') {
+            throw new Error('Error de autenticación')
+          }
+          
+          throw error
         }
       }
     })
@@ -79,37 +97,9 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     maxAge: 30 * 24 * 60 * 60, // 30 días por defecto
   },
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 24 * 60 * 60, // 30 días
-      }
-    },
-    callbackUrl: {
-      name: `next-auth.callback-url`,
-      options: {
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      }
-    },
-    csrfToken: {
-      name: `next-auth.csrf-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      }
-    }
-  },
   pages: {
     signIn: '/auth/login',
+    error: '/auth/login', // Página de error personalizada
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {

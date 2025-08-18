@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { signIn, getSession } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -21,6 +21,48 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Verificar si hay un error en la URL (desde NextAuth)
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      console.log('🔍 Error detectado en URL:', errorParam)
+      let errorMessage = 'Error de autenticación'
+      
+      switch (errorParam) {
+        case 'CredentialsSignin':
+          errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.'
+          break
+        case 'Configuration':
+          errorMessage = 'Error de configuración del servidor. Contacta al administrador.'
+          break
+        case 'AccessDenied':
+          errorMessage = 'Acceso denegado. Tu cuenta puede estar deshabilitada.'
+          break
+        case 'Verification':
+          errorMessage = 'Error de verificación. Intenta de nuevo.'
+          break
+        default:
+          errorMessage = `Error de autenticación: ${errorParam}`
+      }
+      
+      setError(errorMessage)
+    }
+  }, [searchParams])
+
+  // Verificar si ya hay una sesión activa
+  useEffect(() => {
+    const checkSession = async () => {
+      const session = await getSession()
+      if (session) {
+        console.log('✅ Sesión activa detectada, redirigiendo...')
+        router.push('/')
+      }
+    }
+    
+    checkSession()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +93,27 @@ export default function LoginPage() {
 
       if (result?.error) {
         console.error('❌ Error en autenticación:', result.error)
-        setError(`Error de autenticación: ${result.error}`)
+        
+        // Manejar errores específicos
+        let errorMessage = 'Error de autenticación'
+        switch (result.error) {
+          case 'CredentialsSignin':
+            errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.'
+            break
+          case 'Configuration':
+            errorMessage = 'Error de configuración del servidor. Contacta al administrador.'
+            break
+          case 'AccessDenied':
+            errorMessage = 'Acceso denegado. Tu cuenta puede estar deshabilitada.'
+            break
+          case 'Verification':
+            errorMessage = 'Error de verificación. Intenta de nuevo.'
+            break
+          default:
+            errorMessage = `Error de autenticación: ${result.error}`
+        }
+        
+        setError(errorMessage)
       } else if (result?.ok) {
         console.log('✅ Login exitoso, redirigiendo...')
         setIsSuccess(true)

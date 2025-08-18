@@ -10,5 +10,16 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "headers": [
+    {
+      "source": "/api/auth/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
+  ]
 }
