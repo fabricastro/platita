@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -66,7 +68,26 @@ export default function RegisterPage() {
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      <Card className="w-full max-w-md">
+      
+      {/* Logo y Slogan */}
+      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 text-center space-y-4">
+        <div className="flex justify-center">
+          <Image
+            src="/logosf.png"
+            alt="Platita Logo"
+            width={80}
+            height={80}
+            priority
+            className="w-20 h-20"
+          />
+        </div>
+        <h1 className="text-2xl font-bold text-primary">Platita</h1>
+        <p className="text-lg text-muted-foreground max-w-md">
+          Gestiona tu platita de manera inteligente
+        </p>
+      </div>
+
+      <Card className="w-full max-w-md mt-32">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Crear Cuenta</CardTitle>
           <CardDescription className="text-center">
