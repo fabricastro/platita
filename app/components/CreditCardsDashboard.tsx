@@ -338,10 +338,6 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({ clas
       {activeTab === 'installments' && (
         <InstallmentsTracker
           expenses={expenses}
-          selectedMonth={currentMonth}
-          selectedYear={currentYear}
-          onMonthChange={() => {}}
-          onYearChange={() => {}}
         />
       )}
     </div>

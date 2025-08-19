@@ -16,6 +16,12 @@
     "noImplicitAny": false,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
     "plugins": [
       {
         "name": "next"
