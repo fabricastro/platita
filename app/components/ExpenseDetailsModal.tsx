@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react'
 import { X, CreditCard, Receipt, Edit, Trash2, Save, X as CloseIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Expense } from '../types'
-import { formatCurrency, formatDate, formatPriceInput, parseFormattedPrice, formatPriceWhileTyping, parsePriceInput } from '../utils/formatters'
+import { formatCurrency, formatDate, formatPriceInput, parsePriceInput, cleanInstallmentDescription } from '../utils/formatters'
 import { categories } from '../constants'
+import { MoneyInput } from './MoneyInput'
 
 interface ExpenseDetailsModalProps {
   isOpen: boolean
@@ -57,9 +58,19 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
     const expenseDate = new Date(expense.date)
     const formattedDate = expenseDate.toISOString().split('T')[0]
     
+    // Para gastos de tarjeta, usar el monto total en lugar del monto de la cuota
+    const amountToEdit = expense.type === 'tarjeta' && expense.totalAmount 
+      ? expense.totalAmount.toString() 
+      : expense.amount.toString()
+    
+    // Para gastos de tarjeta, limpiar la descripción removiendo el paréntesis de cuotas
+    const cleanDescription = expense.type === 'tarjeta' 
+      ? cleanInstallmentDescription(expense.description)
+      : expense.description
+    
     setEditingData({
-      description: expense.description,
-      amount: expense.amount,
+      description: cleanDescription,
+      amount: amountToEdit,
       category: expense.category,
       date: formattedDate
     })
@@ -85,14 +96,25 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
         if (response.ok) {
           const updatedExpense = await response.json()
           
-          // Actualizar localmente
-          setLocalExpenses(prev => 
-            prev.map(exp => exp.id === id ? updatedExpense : exp)
-          )
-          
-          // Notificar al componente padre
-          if (onExpenseUpdated) {
-            onExpenseUpdated(updatedExpense)
+          // Para gastos de tarjeta, necesitamos recargar todos los gastos ya que se actualizaron múltiples cuotas
+          if (updatedExpense.type === 'tarjeta') {
+            // Cerrar el modal y recargar desde el componente padre
+            onClose()
+            
+            // Notificar al componente padre para que recargue todos los gastos
+            if (onExpenseUpdated) {
+              onExpenseUpdated(updatedExpense)
+            }
+          } else {
+            // Para gastos únicos, actualizar solo localmente
+            setLocalExpenses(prev => 
+              prev.map(exp => exp.id === id ? updatedExpense : exp)
+            )
+            
+            // Notificar al componente padre
+            if (onExpenseUpdated) {
+              onExpenseUpdated(updatedExpense)
+            }
           }
           
           // Salir del modo edición
@@ -100,8 +122,17 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
           setEditingData({})
           
           // Notificación de éxito
-          toast.success(`Gasto "${updatedExpense.description}" actualizado exitosamente`, {
-            description: `${formatCurrency(updatedExpense.amount)} - ${updatedExpense.category}`,
+          const displayAmount = updatedExpense.type === 'tarjeta' && updatedExpense.totalAmount 
+            ? updatedExpense.totalAmount 
+            : updatedExpense.amount
+          
+          // Limpiar la descripción para la notificación
+          const cleanDescriptionForNotification = updatedExpense.type === 'tarjeta' 
+            ? cleanInstallmentDescription(updatedExpense.description)
+            : updatedExpense.description
+            
+          toast.success(`Gasto "${cleanDescriptionForNotification}" actualizado exitosamente`, {
+            description: `${formatCurrency(displayAmount)} - ${updatedExpense.category}`,
             duration: 4000,
           })
         }
@@ -207,24 +238,19 @@ export const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                           placeholder="Descripción"
                         />
-                                                 <input
-                           type="text"
-                           placeholder="Monto (ej: 15.500,50)"
-                           value={formatPriceWhileTyping(String(editingData.amount || ''))}
-                           onChange={(e) => {
-                             // Permitir escribir libremente, incluyendo comas
-                             setEditingData({...editingData, amount: e.target.value})
-                           }}
-                           onBlur={(e) => {
-                             // Al perder el foco, convertir a número y formatear
-                             const parsedValue = parsePriceInput(e.target.value)
-                             if (parsedValue !== undefined) {
-                               setEditingData({...editingData, amount: parsedValue})
-                             }
-                           }}
-                           onKeyDown={(e) => handleKeyDown(e, expense.id)}
-                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
-                         />
+                                                                         <div>
+                          <MoneyInput
+                            value={editingData.amount || ''}
+                            onChange={(value) => setEditingData({...editingData, amount: value})}
+                            placeholder="Ej: 15.500,50"
+                            className="text-sm"
+                          />
+                          {expense.type === 'tarjeta' && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              💳 Monto total de la compra
+                            </p>
+                          )}
+                        </div>
                         <select
                           value={editingData.category || ''}
                           onChange={(e) => setEditingData({...editingData, category: e.target.value})}

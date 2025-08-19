@@ -4,10 +4,13 @@ import React, { useState } from 'react'
 import { PlusCircle, Trash2, Edit, CreditCard, Receipt, Calendar, List, Grid } from 'lucide-react'
 import { toast } from 'sonner'
 import { Expense, ExpenseForm, ExpenseType } from '../types'
-import { formatCurrency, formatDate, formatPriceInput, parseFormattedPrice, formatPriceWhileTyping, parsePriceInput } from '../utils/formatters'
-import { categories } from '../constants'
+import { formatCurrency, formatDate, formatPriceInput, parsePriceInput, cleanInstallmentDescription } from '../utils/formatters'
+import { categories, argentineCreditCards } from '../constants'
 import { ExpensesCalendar } from './ExpensesCalendar'
 import { ExpenseDetailsModal } from './ExpenseDetailsModal'
+import { EnhancedCreditCardSelector } from './EnhancedCreditCardSelector'
+import { InstallmentsTracker } from './InstallmentsTracker'
+import { MoneyInput } from './MoneyInput'
 
 interface ExpensesManagerProps {
   expenses: Expense[]
@@ -37,7 +40,9 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
     amount: '',
     category: 'comida',
     date: new Date().toISOString().split('T')[0],
-    type: 'unico'
+    type: 'unico',
+    purchaseMonth: new Date().toISOString().split('T')[0],
+    cardId: ''
   })
 
   const addExpense = async () => {
@@ -59,9 +64,9 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
     
     if (expenseForm.description && (expenseForm.amount || (expenseForm.type === 'tarjeta' && expenseForm.totalAmount))) {
       // Validar campos específicos para gastos de tarjeta
-      if (expenseForm.type === 'tarjeta' && (!expenseForm.installments || !expenseForm.totalAmount)) {
+      if (expenseForm.type === 'tarjeta' && (!expenseForm.installments || !expenseForm.totalAmount || !expenseForm.purchaseMonth || !expenseForm.cardId)) {
         toast.error('Campos incompletos', {
-          description: 'Para gastos de tarjeta, debes especificar el monto total y el número de cuotas',
+          description: 'Para gastos de tarjeta, debes especificar el monto total, número de cuotas, mes de compra y tarjeta',
           duration: 4000,
         })
         return
@@ -86,7 +91,9 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
             amount: '',
             category: 'comida',
             date: new Date().toISOString().split('T')[0],
-            type: 'unico'
+            type: 'unico',
+            purchaseMonth: new Date().toISOString().split('T')[0],
+            cardId: ''
           })
           
           // Notificación de éxito
@@ -101,6 +108,13 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
               duration: 4000,
             })
           }
+        } else {
+          // Manejar errores específicos de la API
+          const errorData = await response.json()
+          toast.error('Error al agregar el gasto', {
+            description: errorData.error || 'Por favor, inténtalo de nuevo',
+            duration: 4000,
+          })
         }
       } catch (error) {
         console.error('Error adding expense:', error)
@@ -195,14 +209,54 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense.id)
+    
+    // Convertir la fecha al formato YYYY-MM-DD para el input type="date"
+    const expenseDate = new Date(expense.date)
+    const formattedDate = expenseDate.toISOString().split('T')[0]
+    
+    // Para gastos de tarjeta, usar el monto total en lugar del monto de la cuota
+    const amountToEdit = expense.type === 'tarjeta' && expense.totalAmount 
+      ? expense.totalAmount.toString() 
+      : expense.amount.toString()
+    
+    // Para gastos de tarjeta, limpiar la descripción removiendo el paréntesis de cuotas
+    const cleanDescription = expense.type === 'tarjeta' 
+      ? cleanInstallmentDescription(expense.description)
+      : expense.description
+    
+    // Inicializar los datos de edición con los valores actuales
+    setEditingData({
+      description: cleanDescription,
+      amount: amountToEdit,
+      category: expense.category,
+      date: formattedDate
+    })
+    
     closeModal()
   }
 
-  const handleExpenseUpdated = (updatedExpense: Expense) => {
-    // Actualizar el gasto en la lista local
-    setExpenses(prev => 
-      prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp)
-    )
+  const handleExpenseUpdated = async (updatedExpense: Expense) => {
+    // Para gastos de tarjeta, recargar todos los gastos ya que se actualizaron múltiples cuotas
+    if (updatedExpense.type === 'tarjeta') {
+      try {
+        const response = await fetch('/api/expenses')
+        if (response.ok) {
+          const allExpenses = await response.json()
+          setExpenses(allExpenses)
+        }
+      } catch (error) {
+        console.error('Error reloading expenses:', error)
+        // En caso de error, al menos actualizar el gasto actual
+        setExpenses(prev => 
+          prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp)
+        )
+      }
+    } else {
+      // Para gastos únicos, actualizar solo localmente
+      setExpenses(prev => 
+        prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp)
+      )
+    }
   }
 
   const saveExpenseEdit = async (id: string) => {
@@ -270,83 +324,123 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
-            type="text"
-            placeholder="Descripción"
-            value={expenseForm.description}
-            onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            required
-          />
-          
-          {expenseForm.type === 'unico' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              📝 Descripción *
+            </label>
             <input
               type="text"
-              placeholder="Monto (ej: 15.500,50)"
-              value={formatPriceWhileTyping(expenseForm.amount || '')}
-              onChange={(e) => {
-                // Permitir escribir libremente, incluyendo comas
-                setExpenseForm({...expenseForm, amount: e.target.value})
-              }}
-              onBlur={(e) => {
-                // Al perder el foco, convertir a número y formatear
-                const parsedValue = parsePriceInput(e.target.value)
-                if (parsedValue !== undefined) {
-                  setExpenseForm({...expenseForm, amount: parsedValue.toString()})
-                }
-              }}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              placeholder="Ej: Supermercado, Ropa, etc."
+              value={expenseForm.description}
+              onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
+          </div>
+          
+          {expenseForm.type === 'unico' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                💰 Monto del Gasto *
+              </label>
+              <MoneyInput
+                value={expenseForm.amount || ''}
+                onChange={(value) => setExpenseForm({...expenseForm, amount: value})}
+                placeholder="Ej: 15.500,50"
+                required
+              />
+            </div>
           ) : (
             <>
-              <input
-                type="text"
-                placeholder="Monto Total (ej: 150.000,00)"
-                value={formatPriceWhileTyping(expenseForm.totalAmount || '')}
-                onChange={(e) => {
-                  // Permitir escribir libremente, incluyendo comas
-                  setExpenseForm({...expenseForm, totalAmount: e.target.value})
-                }}
-                onBlur={(e) => {
-                  // Al perder el foco, convertir a número y formatear
-                  const parsedValue = parsePriceInput(e.target.value)
-                  if (parsedValue !== undefined) {
-                    setExpenseForm({...expenseForm, totalAmount: parsedValue.toString()})
-                  }
-                }}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
-              />
-              <input
-                type="number"
-                placeholder="Número de Cuotas"
-                value={expenseForm.installments || ''}
-                onChange={(e) => setExpenseForm({...expenseForm, installments: e.target.value})}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                min="1"
-                max="36"
-                required
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  💳 Monto Total de la Compra *
+                </label>
+                <MoneyInput
+                  value={expenseForm.totalAmount || ''}
+                  onChange={(value) => setExpenseForm({...expenseForm, totalAmount: value})}
+                  placeholder="Ej: 150.000,00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  🔢 Número de Cuotas *
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ej: 12"
+                  value={expenseForm.installments || ''}
+                  onChange={(e) => setExpenseForm({...expenseForm, installments: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  min="1"
+                  max="36"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  En cuántas cuotas pagarás
+                </p>
+              </div>
             </>
           )}
           
-          <select
-            value={expenseForm.category}
-            onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat} className="capitalize">{cat}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={expenseForm.date}
-            onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              🏷️ Categoría *
+            </label>
+            <select
+              value={expenseForm.category}
+              onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat} className="capitalize">{cat}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              📅 Fecha del Gasto *
+            </label>
+            <input
+              type="date"
+              value={expenseForm.date}
+              onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Fecha en que realizaste el gasto
+            </p>
+          </div>
+          
+                     {/* Campos adicionales para gastos de tarjeta */}
+           {expenseForm.type === 'tarjeta' && (
+             <>
+               <div className="md:col-span-2">
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                   📅 Mes de Compra *
+                 </label>
+                 <input
+                   type="date"
+                   placeholder="Mes de Compra"
+                   value={expenseForm.purchaseMonth || ''}
+                   onChange={(e) => setExpenseForm({...expenseForm, purchaseMonth: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                   required
+                 />
+                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                   Fecha en que realizaste la compra con la tarjeta
+                 </p>
+               </div>
+               <EnhancedCreditCardSelector
+                 selectedCardId={expenseForm.cardId}
+                 onCardSelect={(card) => setExpenseForm({...expenseForm, cardId: card.id})}
+                 className="md:col-span-2"
+               />
+             </>
+           )}
           
           {expenseForm.type === 'tarjeta' && expenseForm.totalAmount && expenseForm.installments && (
             <div className="md:col-span-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-md">
@@ -401,17 +495,7 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
               Lista
             </button>
             {/* Botón de prueba temporal */}
-            <button
-              onClick={() => {
-                toast.success('Prueba de notificación', {
-                  description: 'Esta es una notificación de prueba para verificar los colores',
-                  duration: 4000,
-                })
-              }}
-              className="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
-            >
-              Probar Notificación
-            </button>
+
           </div>
         </div>
       </div>
@@ -432,7 +516,20 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
             {expenses.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 text-center py-4">No hay gastos registrados</p>
             ) : (
-              expenses.map(expense => (
+              (() => {
+                // Agrupar gastos de tarjeta por descripción base y fecha de compra
+                const groupedExpenses = expenses.reduce((acc: any[], expense) => {
+                  if (expense.type === 'tarjeta' && expense.currentInstallment === 1) {
+                    // Solo mostrar la primera cuota de cada gasto de tarjeta
+                    acc.push(expense)
+                  } else if (expense.type === 'unico') {
+                    // Mostrar todos los gastos únicos
+                    acc.push(expense)
+                  }
+                  return acc
+                }, [])
+                
+                return groupedExpenses.map(expense => (
                 <div key={expense.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
                   {editingExpense === expense.id ? (
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
@@ -444,24 +541,19 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
                         autoFocus
                       />
-                      <input
-                        type="text"
-                        placeholder="Monto"
-                        value={formatPriceWhileTyping(String(editingData.amount || ''))}
-                        onChange={(e) => {
-                          // Permitir escribir libremente, incluyendo comas
-                          setEditingData({...editingData, amount: e.target.value})
-                        }}
-                        onBlur={(e) => {
-                          // Al perder el foco, convertir a número y formatear
-                          const parsedValue = parsePriceInput(e.target.value)
-                          if (parsedValue !== undefined) {
-                            setEditingData({...editingData, amount: parsedValue})
-                          }
-                        }}
-                        onKeyDown={(e) => handleKeyDown(e, expense.id)}
-                        className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
-                      />
+                      <div>
+                        <MoneyInput
+                          value={editingData.amount || ''}
+                          onChange={(value) => setEditingData({...editingData, amount: value})}
+                          placeholder={expense.type === 'tarjeta' ? 'Monto total' : 'Monto'}
+                          className="px-2 py-1 text-sm"
+                        />
+                        {expense.type === 'tarjeta' && (
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            💳 Total
+                          </p>
+                        )}
+                      </div>
                       <select
                         value={editingData.category || ''}
                         onChange={(e) => setEditingData({...editingData, category: e.target.value})}
@@ -505,22 +597,42 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {expense.category} • {new Date(expense.date).toLocaleDateString('es-AR')}
-                          {expense.type === 'tarjeta' && expense.installments && expense.currentInstallment && (
+                          {expense.type === 'tarjeta' && expense.installments && (
                             <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                              Cuota {expense.currentInstallment}/{expense.installments}
+                              {expense.installments} cuotas
                             </span>
                           )}
                         </div>
-                        {expense.type === 'tarjeta' && expense.totalAmount && (
-                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            Total: {formatCurrency(expense.totalAmount)}
+                        {expense.type === 'tarjeta' && expense.purchaseMonth && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            Compra: {new Date(expense.purchaseMonth).toLocaleDateString('es-AR')}
                           </div>
                         )}
+                        {expense.type === 'tarjeta' && expense.card && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                            <div 
+                              className="w-3 h-2 rounded"
+                              style={{ backgroundColor: expense.card.color }}
+                            />
+                            {expense.card.name} • {expense.card.bank}
+                          </div>
+                        )}
+
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className={`font-bold ${expense.type === 'tarjeta' ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(expense.amount)}
-                        </span>
+                        <div className="text-right">
+                          <span className={`font-bold ${expense.type === 'tarjeta' ? 'text-green-600' : 'text-red-600'}`}>
+                            {expense.type === 'tarjeta' && expense.totalAmount 
+                              ? formatCurrency(expense.totalAmount) 
+                              : formatCurrency(expense.amount)
+                            }
+                          </span>
+                          {expense.type === 'tarjeta' && expense.totalAmount && expense.installments && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatCurrency(expense.totalAmount / expense.installments)} × {expense.installments}
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => handleEditExpense(expense)}
                           className="text-blue-500 hover:text-blue-700"
@@ -539,7 +651,8 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
                     </div>
                   )}
                 </div>
-              ))
+                ))
+              })()
             )}
           </div>
         </div>
@@ -554,6 +667,11 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, setE
         onEditExpense={handleEditExpense}
         onDeleteExpense={deleteExpense}
         onExpenseUpdated={handleExpenseUpdated}
+      />
+
+      {/* Seguimiento de cuotas */}
+      <InstallmentsTracker
+        expenses={expenses}
       />
     </div>
   )
